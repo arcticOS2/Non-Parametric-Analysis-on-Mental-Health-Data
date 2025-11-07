@@ -34,7 +34,6 @@ It contains self-reported responses from students regarding their **mental healt
 ### 2. **Statistical Tests Used**
 | Test | Purpose | Example |
 |------|----------|----------|
-| **Shapiro-Wilk Test** | To test normality | Depression distribution |
 | **Mann-Whitney U Test** | Compare two groups | Depression vs Gender |
 | **Kruskal-Wallis Test** | Compare more than two groups | Academic pressure vs Residential status |
 | **Anderson-Darling k-sample Test** | Compare multiple distributions | Sleep quality across departments |
