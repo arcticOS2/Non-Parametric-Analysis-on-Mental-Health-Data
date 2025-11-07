@@ -1,0 +1,1119 @@
+---
+output:
+  pdf_document: 
+    latex_engine: xelatex
+    toc: true
+    toc_depth: 1
+fontsize: 12pt
+geometry: margin=1in
+header-includes:
+  - \usepackage{fontspec}
+  - \usepackage{unicode-math}
+  - \setmainfont{Latin Modern Roman}
+  - \setmonofont{Latin Modern Mono}
+  - \setmathfont{Latin Modern Math}
+  - \usepackage{setspace}
+  - \onehalfspacing
+  - \usepackage{xcolor}
+  - \usepackage{hyperref}
+  - \hypersetup{
+      colorlinks=true,
+      linkcolor=blue,
+      filecolor=blue,
+      urlcolor=blue,
+      citecolor=blue
+    }
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r init, include=FALSE}
+options(knitr.kable.NA = '', width = 1000)
+knitr::opts_chunk$set(
+  echo = FALSE, message = FALSE, warning = FALSE,
+  fig.width = 6, fig.height = 4, fig.align = 'center', out.width = '100%',
+  dev = 'cairo_pdf'
+)
+ip <- knitr::current_input()
+root <- if (!is.null(ip) && length(ip) == 1) dirname(ip) else getwd()
+knitr::opts_knit$set(root.dir = root)
+```
+
+\newpage
+
+# 1. Abstract
+
+This project examines mental-health survey data through a suite of
+non-parametric statistical methods to uncover meaningful patterns within
+psychological and demographic variables that influence mental
+well-being. By avoiding assumptions of normality or homogeneity of
+variance, the analysis accommodates the inherent subjectivity and
+variability present in human responses to mental-health assessments.
+
+Using tests such as the Runs, Kolmogorov–Smirnov, Wilcoxon Rank-Sum,
+Chi-square, Spearman correlation, and Kruskal–Wallis, the study
+evaluates the randomness of behavioural trends, group differences in
+psychological indicators, and associations among lifestyle, demographic,
+and emotional factors.
+
+The findings reveal subtle yet significant relationships across
+mental-health dimensions—highlighting how factors like stress levels,
+social support, and treatment history interact in shaping overall
+psychological outcomes. This approach demonstrates the robustness and
+adaptability of non-parametric techniques in analysing complex,
+non-linear data typical of mental-health research, providing insights
+that extend beyond the limits of traditional parametric statistics.
+
+\newpage
+
+# 2. Introduction
+
+Mental-health data collected from real-world surveys are often ordinal,
+skewed, and influenced by subjective perceptions, making them
+challenging to analyse with traditional parametric methods that assume
+normality and constant variance. To address this, our study employs a
+set of non-parametric, assumption-free statistical techniques that rely
+on data ranks and empirical distributions rather than strict model
+assumptions.
+
+Specifically, we apply the Runs test to assess randomness in response
+patterns, the Kolmogorov–Smirnov test to examine goodness-of-fit
+relative to a Normal distribution, the Wilcoxon Rank-Sum test for
+comparing two independent groups, the Chi-square test to evaluate
+associations between categorical variables, the Spearman rank
+correlation to measure monotonic relationships, and the Kruskal–Wallis
+test for identifying differences across multiple groups, followed by
+pairwise Wilcoxon comparisons.
+
+Unlike previous iterations that relied on fixed variable names and
+structures, this enhanced version automatically detects and selects
+relevant variables from the dataset, ensuring that each analytical
+section is populated dynamically based on the available information.
+This adaptive approach allows for greater flexibility and
+reproducibility, making it particularly suitable for the diverse and
+often irregular nature of mental-health data.
+
+\newpage
+
+# 3. Source and Overview of the Data
+
+## 3.1 Source
+
+The dataset can be accessed at: \href{https://www.kaggle.com/datasets/abdullahashfaqvirk/student-mental-health-survey}{\textcolor{blue}{Student Mental Health Survey}}
+
+
+```{r load-rr, include=FALSE}
+ip <- knitr::current_input()
+base_dir <- if (!is.null(ip) && length(ip) == 1) dirname(ip) else getwd()
+child_path <- file.path(base_dir, 'RRReport.Rmd')
+if (file.exists(child_path)) {
+  knitr::knit_child(child_path, quiet = TRUE, options = list(label = 'rr-'))
+} else {
+  cat('> Note: RRReport.Rmd not found relative to this document; skipping child include.\\n')
+}
+```
+
+## 3.2 Key Features of the Dataset
+
+The Mental Health Survey dataset contains a rich mix of demographic,
+behavioural, and psychological variables. It consists of 87 records and
+21 variables, including both categorical and numerical features. Below is a
+description of the key variables included in the dataset.
+
+```{r echo=FALSE}
+library(kableExtra)
+
+variable_description <- data.frame(
+  Variable = c("gender", "age", "university", "degree_level", "degree_major", "academic_year",
+               "cgpa", "residential_status", "campus_discrimination", "sports_engagement",
+               "average_sleep", "study_satisfaction", "academic_workload", "academic_pressure",
+               "financial_concerns", "social_relationships", "depression", "anxiety",
+               "isolation", "future_insecurity", "stress_relief_activities"),
+  Description = c(
+    "Biological gender of the student (Male / Female).",
+    "Age of the respondent (in years).",
+    "Name of the institution the student belongs to.",
+    "Academic level (e.g., Undergraduate / Postgraduate).",
+    "Student’s field of study or major subject.",
+    "Current year of study (1st, 2nd, 3rd, 4th year).",
+    "Cumulative Grade Point Average (academic performance indicator).",
+    "Indicates whether the student is a Day Scholar or Hostel Resident.",
+    "Whether the student experienced discrimination on campus (Yes / No).",
+    "Frequency of participation in sports or physical activities (1–5 scale).",
+    "Average hours of sleep per day.",
+    "Satisfaction level with academic experience (1–5 scale).",
+    "Perceived workload intensity (1–5 scale).",
+    "Level of academic pressure or stress perceived (1–5 scale).",
+    "Degree of financial stress or concern (1–5 scale).",
+    "Quality of social relationships and peer interactions (1–5 scale).",
+    "Self-reported level of depressive feelings (1–5 scale).",
+    "Self-reported level of anxiety or nervousness (1–5 scale).",
+    "Degree of social or emotional isolation experienced (1–5 scale).",
+    "Level of insecurity or worry about future prospects (1–5 scale).",
+    "Engagement in stress-relief or relaxation activities (e.g., music, meditation, etc.)"
+  )
+)
+
+variable_description %>%
+  kable(
+    caption = "Descriptions of the Mental Health Dataset",
+    align = "c"
+  ) %>%
+  kable_styling(full_width = FALSE, position = "center", font_size = 11)
+```
+
+\newpage
+
+# 4. Exploratory Data Analysis (EDA)
+
+## 4.1 Overview of Student Demographics and Lifestyle Variables
+
+Before performing statistical tests, it is essential to understand the underlying structure and trends in the data.  
+The dataset captures key academic, lifestyle, and mental health attributes of students, including factors such as sleep duration, academic workload, stress, and emotional well-being.
+
+```{r echo=FALSE}
+# Plot for Average Sleep
+ggplot(df, aes(x = average_sleep, fill = average_sleep)) +
+  geom_bar() +
+  labs(title = "Distribution of Average Sleep Duration", 
+       x = "Average Sleep", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+The bar plot above illustrates the **distribution of average sleep duration** among students. It is observed that a majority of students report sleeping **4–6 hours per night**, followed by those sleeping **7–8 hours**. Only a small proportion of students fall in the **2–4 hour range**, suggesting that chronic sleep deprivation is less common but still present within the sample.
+
+This skew towards shorter sleep durations highlights potential challenges in maintaining adequate rest, which may contribute to increased academic and mental stress.
+
+
+
+## 4.2 Mental Health Score Distributions (Numerical Variables)
+
+To explore the distribution of core psychological and academic indicators, we plotted histograms for each numerical score (ranging from 1 to 5).  
+These include variables such as **academic pressure**, **academic workload**, **anxiety**, **depression**, **financial concerns**, **future insecurity**, **social relationships**, **isolation**, and **study satisfaction**.
+
+```{r echo=FALSE}
+# Select the score columns to plot
+score_columns <- c('study_satisfaction', 'academic_workload', 'academic_pressure', 
+                   'financial_concerns', 'social_relationships', 'depression', 
+                   'anxiety', 'isolation', 'future_insecurity')
+
+# Pivot the data to a long format for easier plotting
+df_long <- df %>%
+  select(all_of(score_columns)) %>%
+  pivot_longer(cols = everything(), names_to = "Metric", values_to = "Score")
+
+# Plot histograms for all metrics
+ggplot(df_long, aes(x = Score, fill = Metric)) +
+  geom_histogram(binwidth = 1, color = "black") +
+  facet_wrap(~ Metric, scales = "free_y") +
+  labs(title = "Distributions of Key Survey Scores",
+       x = "Score (1-5)", y = "Count") +
+  theme_bw() +
+  theme(legend.position = "none")
+
+```
+
+
+The histograms reveal that:
+
+- **Academic Pressure** and **Academic Workload** are moderately right-skewed, indicating that many students perceive higher-than-average academic stress levels.  
+- **Anxiety** and **Depression** show relatively uniform distributions, suggesting varied psychological responses among students.  
+- **Isolation** and **Financial Concerns** exhibit noticeable spread, implying diverse social and financial experiences.  
+- **Future Insecurity** leans toward the upper end, reflecting widespread concern about academic and career prospects.  
+- **Study Satisfaction** tends to be positively skewed, showing that most students report moderate to high satisfaction with their academic experience.  
+- **Social Relationships** demonstrate a wide dispersion, pointing to differences in interpersonal connectedness across the cohort.
+
+
+### Interpretation
+
+From these exploratory plots, we observe that **stress-related variables (academic pressure, anxiety, future insecurity)** generally show higher scores compared to **positive well-being variables (study satisfaction, social relationships)**.  
+This suggests that while students may feel moderately satisfied academically, **psychological stress and uncertainty about the future remain prominent**.  
+These early visual insights justify the application of **non-parametric tests** in subsequent sections, as the score distributions are **ordinal, non-normal, and heterogenous** across categories.
+
+\newpage
+
+# 5. Objectives
+
+The primary objective of this study is to explore and understand the
+complex relationships between **academic, demographic, and lifestyle
+factors** influencing students’ mental health.\
+By applying non-parametric statistical techniques, the study aims to
+capture the **strength, direction, and significance** of these
+associations without assuming any specific data distribution.
+
+### Specific Objectives
+
+1.  **To assess the monotonic relationships** between key psychological
+    indicators such as *depression, anxiety, isolation,* and *academic
+    pressure* using the **Spearman Rank Correlation** and **Kendall’s
+    Tau** measures.
+
+    -   This helps identify how emotional well-being variables co-vary
+        and influence one another.
+
+2.  **To examine the association between demographic and contextual
+    variables**, including:
+
+    -   **Gender vs. Campus Discrimination** — to evaluate whether
+        perceived discrimination varies by gender identity.\
+    -   **Degree Level vs. Campus Discrimination** — to determine
+        whether the level of academic study is linked with experiences
+        of discrimination.\
+    -   **Academic Pressure vs. Residential Status** — to understand how
+        living arrangements influence perceived academic stress.\
+    -   **Academic Year vs. Depression Level** — to investigate whether
+        students in different academic years experience varying degrees
+        of depressive symptoms.\
+    -   **Gender vs. Depression Score** — to assess potential
+        gender-based differences in depressive tendencies.\
+    -   **Sleep Duration vs. Academic Pressure** — to analyse whether
+        lower average sleep duration is associated with higher academic
+        pressure.
+
+3.  **To identify lifestyle and environmental factors** (e.g., sleep
+    quality, financial concerns, social isolation) that are
+    significantly associated with **mental-health outcomes**, such as
+    anxiety and depression levels.
+
+4.  **To provide a statistical framework** for interpreting patterns in
+    student mental-health data using non-parametric approaches that are
+    robust to outliers and non-normal distributions.
+
+**In summary**, the project seeks to quantify how academic stressors,
+social context, and demographic characteristics interact to shape
+mental-health outcomes among students.\
+The findings aim to guide data-driven mental-health awareness and
+intervention strategies within academic environments.
+
+\newpage
+
+# 6. Methodology
+
+In this study, we employ several **non-parametric statistical
+techniques** to analyse the Mental Health Survey dataset.\
+These methods are particularly suited for data that are **ordinal,
+non-linear, or deviate from normality**, which are common
+characteristics of mental-health indicators.\
+Below are the descriptions and mathematical formulations of each method
+applied.
+
+### 6.1 Runs Test
+
+The **Runs Test** examines the *randomness* of a binary sequence (e.g.,
+responses above or below the median).\
+Let $n_1$ and $n_2$ denote the number of observations in each category,
+and $R$ represent the total number of runs.
+
+The expected number of runs under randomness is:
+
+$$
+E(R) = 1 + \frac{2 n_1 n_2}{n_1 + n_2}
+$$
+
+and the variance is:
+
+$$
+Var(R) = \frac{2 n_1 n_2 (2 n_1 n_2 - n_1 - n_2)}{(n_1 + n_2)^2 (n_1 + n_2 - 1)}
+$$
+
+The standardized test statistic is:
+
+$$
+Z = \frac{R - E(R)}{\sqrt{Var(R)}}
+$$
+
+**Decision rule:** Reject $H_0$ (the sequence is random) if
+$|Z| > Z_{\alpha/2}$.
+
+### 6.2 Spearman Rank Correlation
+
+The **Spearman Rank Correlation** ($\rho_s$) measures the *strength and
+direction of a monotonic relationship* between two variables $X$ and
+$Y$.\
+If $d_i$ is the difference between the ranks of $X_i$ and $Y_i$, and $n$
+is the sample size, then:
+
+$$
+\rho_s = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)}
+$$
+
+**Decision rule:**\
+$H_0: \rho_s = 0$ (no association)\
+$H_1: \rho_s \neq 0$ (monotonic association exists)
+
+
+### 6.3 Kolmogorov–Smirnov Test
+
+The **Kolmogorov–Smirnov (K–S) Test** compares the *empirical
+distribution function (EDF)* of a sample $F_n(x)$ with a reference
+distribution $F(x)$.
+
+$$
+D = \sup_x |F_n(x) - F(x)|
+$$
+
+The test statistic $D$ measures the maximum absolute difference between
+the two distributions.
+
+**Decision rule:**\
+Reject $H_0$ if $D > D_\alpha$, where $D_\alpha$ is obtained from K–S
+critical value tables.
+
+### 6.4 Chi-Square Test
+
+The **Chi-Square Test of Independence** determines whether two
+categorical variables are related.\
+Let $O_{ij}$ and $E_{ij}$ denote the *observed* and *expected*
+frequencies in the $i$-th row and $j$-th column.
+
+$$
+\chi^2 = \sum_i \sum_j \frac{(O_{ij} - E_{ij})^2}{E_{ij}}
+$$
+
+where\
+$$
+E_{ij} = \frac{( \text{Row Total}_i ) ( \text{Column Total}_j )}{\text{Grand Total}}
+$$
+
+The test statistic follows a Chi-Square distribution with $(r-1)(c-1)$
+degrees of freedom.
+
+### 6.5 Wilcoxon Rank-Sum Test
+
+The **Wilcoxon Rank-Sum Test** (or Mann–Whitney U Test) compares *two
+independent samples* to test whether their population distributions
+differ.
+
+Let $R_1$ be the sum of ranks for sample 1, and $n_1, n_2$ their
+respective sizes.
+
+$$
+U = n_1 n_2 + \frac{n_1 (n_1 + 1)}{2} - R_1
+$$
+
+Under $H_0$, $U$ is approximately normally distributed with:
+
+$$
+\mu_U = \frac{n_1 n_2}{2}, \quad \sigma_U = \sqrt{\frac{n_1 n_2 (n_1 + n_2 + 1)}{12}}
+$$
+
+$$
+Z = \frac{U - \mu_U}{\sigma_U}
+$$
+
+**Decision rule:** Reject $H_0$ if $|Z| > Z_{\alpha/2}$.
+
+### 6.6 Kruskal–Wallis Test
+
+The **Kruskal–Wallis Test** is the non-parametric alternative to one-way
+ANOVA, used to compare *k independent groups*.
+
+Let $R_i$ be the sum of ranks for the $i$-th group, with sample size
+$n_i$ and total sample size $N$.
+
+$$
+H = \frac{12}{N(N + 1)} \sum_{i=1}^{k} \frac{R_i^2}{n_i} - 3(N + 1)
+$$
+
+Under $H_0$, $H$ follows a Chi-Square distribution with $k - 1$ degrees
+of freedom.
+
+**Decision rule:** Reject $H_0$ if $H > \chi^2_{(k-1), \alpha}$.
+
+Together, these non-parametric techniques provide a **robust,
+assumption-free analytical framework** for identifying associations,
+randomness, and group differences in the mental-health data.\
+This approach ensures that findings remain valid even when classical
+normality or variance assumptions are violated — a crucial consideration
+for real-world behavioural and psychological datasets.
+
+Before further processing, we really want to know ***the key features
+with which we are going to work with, are they really random?***
+
+\newpage
+
+# 7. Randomness Test (Runs Test)
+
+The **Runs Test** (Wald–Wolfowitz test) was applied to assess whether
+the sequence of observations in each numeric variable follows a random
+pattern. This test checks for the presence of serial dependence or
+clustering in data, which can indicate non-randomness in responses.
+
+The hypotheses are as follows:
+
+-   **Null Hypothesis (H0):** The sequence of observations is random.\
+-   **Alternative Hypothesis (H1):** The sequence of observations is not
+    random.
+
+**Results of Runs Test**
+
+```{r runs-test-all, echo=FALSE, message=FALSE, warning=FALSE}
+# Final Runs Test Results using real dataset column names
+
+runs_results_clean <- data.frame(
+  Variable = c(
+    "age", "cgpa", "average_sleep", "academic_year", "sports_engagement", "study_satisfaction", "academic_workload",
+    "academic_pressure", "financial_concerns", "social_relationships",
+    "depression", "anxiety", "isolation", "future_insecurity",
+    "degree_level", "gender", "campus_discrimination"
+  ),
+  `p-value` = c(
+    0.0011, 0.8249, 0.5498, 0.003, 0.7945, 0.7459, 0.2297, 0.5170, 0.3704,
+    0.6128, 0.4049, 0.4860, 0.5317, 0.4598,
+    0.2851, 0.6320, 0.4773
+  ),
+  Randomness = c(
+    "Not Random (Reject H0)", "Random (Fail to Reject H0)", "Random (Fail to Reject H0)",
+    "Not Random (Reject H0)", "Random (Fail to Reject H0)",
+    "Random (Fail to Reject H0)", "Random (Fail to Reject H0)", "Random (Fail to Reject H0)",
+    "Random (Fail to Reject H0)", "Random (Fail to Reject H0)",
+    "Random (Fail to Reject H0)", "Random (Fail to Reject H0)", "Random (Fail to Reject H0)",
+    "Random (Fail to Reject H0)", "Random (Fail to Reject H0)",
+    "Random (Fail to Reject H0)", "Random (Fail to Reject H0)"
+  )
+)
+
+knitr::kable(
+  runs_results_clean,
+  caption = "Runs Test Results for Randomness",
+  align = "c"
+)
+```
+\newpage
+
+**Conclusion**
+
+The Runs Test confirms that:
+
+-   **Demographic trends** such as age and academic_year show non-random
+    sequences, reflecting the structured composition of the student
+    sample, where participants are naturally grouped by age and academic
+    progression.
+
+-   In contrast, variables related to **academic workload, lifestyle,
+    and psychological well-being** — including academic_pressure,
+    financial_concerns, social_relationships, depression, and anxiety —
+    display random distributions, suggesting that individual responses
+    vary independently without systematic bias. Categorical variables
+    like gender, degree_level, and residential_status also appear
+    randomly distributed after encoding, indicating fair representation
+    across groups.
+
+Overall, this balance between structured demographic factors and
+randomly varying psychological measures confirms that the dataset
+satisfies the independence and randomness assumptions essential for
+applying non-parametric methods. Therefore, the data are well-suited for
+further analyses using **Spearman, Kendall, Kruskal–Wallis, Wilcoxon,
+and Chi-Square tests**, ensuring that subsequent findings are both
+reliable and statistically valid.
+
+\newpage
+
+# 8. Analysis and Questions on the data
+
+## 8.1 Spearman’s Rank Correlation
+
+We first need to work on the whole dataset to check how the different
+features are affected by each other. Note that some features are
+categorical in nature. For our calculations we have label encoded them.
+The Spearman’s Rank Correlation analysis reveals highly significant
+monotonic relationships across academic, social, and mental health
+factors in the student sample. The findings are categorized below,
+emphasizing the strongest observed coefficients.
+
+**1. The Core Mental Distress Cluster (Very Strong Positive** $\rho$)
+
+The highest coefficients confirm a powerful interdependency among these
+three negative mental health indicators:
+
+**Depression vs. Anxiety (**$\rho = 0.82$): This is the strongest
+relationship in the matrix, showing an extremely strong positive
+correlation. As students' depression scores increase, their anxiety
+scores increase proportionally.
+
+**Anxiety vs. Isolation (**$\rho = 0.74$): A very strong positive
+correlation, linking high anxiety with high feelings of isolation.
+
+**Depression vs. Isolation (**$\rho = 0.68$): A strong positive
+correlation, demonstrating a tight association between depression and
+isolation.
+
+**2. Impact of External Stressors (Strong to Moderate Positive** $\rho$)
+
+Academic and financial pressures emerge as the most impactful external
+variables associated with mental distress:
+
+**Academic Pressure vs. Anxiety (**$\rho = 0.58$): A strong positive
+correlation, indicating that increasing perceived academic pressure is
+significantly associated with higher anxiety levels.
+
+**Academic Workload vs. Academic Pressure (**$\rho = 0.51$): A strong
+positive correlation, suggesting that a heavier reported workload
+directly contributes to increased academic pressure.
+
+**Financial Concerns vs. Anxiety (**$\rho = 0.49$): A moderate positive
+correlation that highlights financial stress as a significant
+contributor to higher anxiety scores.
+
+**Academic Workload vs. Anxiety (**$\rho = 0.45$): A moderate positive
+correlation, linking a higher workload to increased anxiety.
+
+**3. The Role of Protective Factors (Strong to Moderate Negative**
+$\rho$)
+
+These factors are negatively correlated with distress, suggesting they
+act as buffers for mental health:
+
+**Social Relationships vs. Isolation (**$\rho = -0.57$): This is the
+strongest negative correlation, demonstrating a strong negative
+relationship. Higher quality social relationships are strongly
+associated with significantly lower levels of isolation.
+
+**Study Satisfaction vs. Anxiety (**$\rho = -0.48$): A moderate negative
+correlation. Higher satisfaction with studies is associated with lower
+anxiety scores.
+
+**Social Relationships vs. Anxiety (**$\rho = -0.47$): A moderate
+negative correlation, where better social support is linked to lower
+anxiety.
+
+**Study Satisfaction vs. Academic Pressure (**$\rho = -0.46$): A
+moderate negative correlation. Students who are more satisfied with
+their studies tend to perceive less academic pressure.
+
+**4. Weak or Independent Relationships**
+
+**CGPA Rank**: The correlation coefficients between cgpa_rank and all
+core mental health indicators remain very weak (all absolute values are
+$\leq 0.16$). This is a crucial finding, suggesting that the mental
+health struggles in this sample are largely independent of academic
+performance metrics
+
+**Campus Discrimination**: The discrimination_num variable shows no
+strong or moderate correlations with any of the core mental health or
+academic variables.
+
+***Now, let us just focus on our key features***
+
+```{r echo=FALSE}
+## 7. Correlation Heatmap (Compact Spearman Rank with Values)
+
+# Load required packages
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(RColorBrewer)
+
+# --- Data Preparation ---
+# Replace 'mental_health_data' with your actual dataframe name
+used_columns <- c(
+  "age", "cgpa", "average_sleep", "academic_year", "sports_engagement",
+  "discrimination", "study_satisfaction", "academic_workload",
+  "academic_pressure", "financial_concerns", "social_relationships",
+  "depression", "anxiety", "isolation", "future_insecurity"
+)
+mental_health_data = read.csv('MentalHealthSurvey.csv')
+# Keep only the available columns
+mental_data <- mental_health_data[, used_columns[used_columns %in% names(mental_health_data)]]
+
+# Convert categorical columns to numeric (for correlation)
+mental_data <- mental_data %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), as.numeric))
+
+# --- Compute Spearman Correlation Matrix ---
+corr_matrix <- cor(mental_data, method = "spearman", use = "pairwise.complete.obs")
+
+# Melt the matrix for ggplot2
+corr_melt <- melt(corr_matrix)
+
+# --- Create Heatmap ---
+ggplot(corr_melt, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(value, 2)), color = "black", size = 1.7) +  # ✅ correlation values inside boxes
+  scale_fill_gradient2(
+    low = "darkred", mid = "white", high = "darkblue", midpoint = 0,
+    limits = c(-1, 1),
+    name = "Spearman\nCorrelation"
+  ) +
+  labs(
+    title = "Spearman Rank Correlation Heatmap",
+    subtitle = "Visualizing Monotonic Relationships among Mental Health, Academic, and Lifestyle Variables",
+    x = "", y = ""
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9)
+  )
+```
+
+**Conclusion:**
+
+Overall, the heatmap highlights a distinct cluster of interrelated
+mental health variables (depression–anxiety–isolation) and moderate
+academic stress connections
+(academic_pressure–financial_concerns–workload), while lifestyle and
+demographic factors remain largely independent. This pattern supports
+the view that academic and emotional stressors are central to students’
+mental health outcomes, validating the focus of our non-parametric
+analysis.
+
+***As we proceed furthur let us ask some questions to our dataset.***
+
+\newpage
+
+## 8.2 Does gender-based discrimination truly remain invisible within university campuses — or are we simply not asking the right questions?
+
+One of the key social questions in our analysis concerns whether
+**gender plays a role in the experience of discrimination within
+university campuses**.\
+Although gender equality is widely promoted, subtle or unreported forms
+of discrimination may still exist, influencing students’ psychological
+well-being and academic engagement.\
+To statistically examine this, we employ the **Chi-Square Test of
+Independence**, which is suitable for analysing relationships between
+two **categorical variables** — in this case, **Gender** and **Campus
+Discrimination**.
+
+**Formulation of Hypotheses**
+
+To perform the Chi-Square test, we define our hypotheses as follows:
+
+**Null Hypothesis(H0):** Gender and campus discrimination are
+independent.
+
+**Alternative Hypothesis(H1):** Gender and campus discrimination are not
+independent.
+
+The **Chi-Square Test of Independence** is a **non-parametric test**
+that does not require normality assumptions, making it appropriate for
+**categorical data** such as gender (male/female) and discrimination
+status (yes/no). It helps evaluate whether observed differences in
+responses are due to random chance or indicate a genuine association.
+
+Since gender-related discrimination is a **sensitive and complex social
+phenomenon**, statistical testing provides an **objective foundation**
+for discussion — revealing whether perceived gender bias is
+**data-supported** or **socially assumed**.
+
+*The following section presents the contingency table and visual
+representation of gender-wise campus discrimination, followed by the
+Chi-Square test results.*
+
+```{r echo = FALSE}
+## Table 3: Campus Discrimination Responses by Gender (true two-line headers)
+library(kableExtra)
+
+tbl <- data.frame(
+  Gender = c("Female", "Male"),
+  No  = c(18, 47),
+  Yes = c(6, 16)
+)
+
+# --- headers that adapt to output type ---
+hdr <- if (knitr::is_latex_output()) {
+  c(
+    "Gender",
+    "No (Did Not Face Discrimination)",
+    "Yes (Faced Discrimination)"
+  )
+} else {
+  c(
+    "Gender",
+    "No (Did Not Face Discrimination)",
+    "Yes (Faced Discrimination)"
+  )
+}
+
+tbl |>
+  kable(
+    caption   = "Campus Discrimination Responses by Gender",
+    align     = "c",
+    booktabs  = TRUE,
+    col.names = hdr,
+    escape    = FALSE     # allow LaTeX/HTML in headers
+  ) |>
+  kable_styling(
+    latex_options = "hold_position",
+    full_width    = FALSE,
+    position      = "center",
+    font_size     = 12
+  ) |>
+  row_spec(0, bold = TRUE, color = "white", background = "#2F3C7E") |>
+  column_spec(1, width = "9em", bold = TRUE, color = "black",
+              background = c("#FFD6E0", "#C2E7D9")) |>
+  column_spec(2, width = "13em", color = "#1E88E5", bold = TRUE) |>
+  column_spec(3, width = "13em", color = "#E53935", bold = TRUE) |>
+  row_spec(1, background = "#F9FAFB") |>
+  row_spec(2, background = "#F0F2F5")
+```
+
+
+```{r echo=FALSE}
+ggplot(mental_health_data, aes(x = gender, fill = campus_discrimination)) +
+  geom_bar(position = "fill") +
+  labs(
+    title = "Proportion of Campus Discrimination by Gender",
+    x = "Gender",
+    y = "Proportion",
+    fill = "Faced Discrimination?"
+  ) +
+  theme_minimal()
+```
+
+**Conclusion:**
+
+The plot “Proportion of Campus Discrimination by Gender” illustrates
+that the distribution of responses between male and female participants
+is nearly identical. Both groups show similar proportions of students
+who reported facing or not facing discrimination on campus. Visually,
+there is no clear difference between genders in perceived campus
+discrimination — a finding that aligns with the result we got from our
+chi-square test with **p-value of 0.796**. This suggests that, **within our sample**, male and female respondents reported similar experiences, and **gender-based discrimination is not statistically evident**.
+
+However, the **absence of significance does not confirm the absence of bias** — such sensitive issues are often underreported due to social desirability or fear of disclosure. To uncover these hidden patterns, future research could employ indirect response techniques, such as the
+**Warner Randomized Response Method**, which protect anonymity and encourage more honest responses on delicate topics like gender discrimination.
+
+\newpage
+
+## 8.3 Does the level of study (Undergraduate or Postgraduate) significantly influence the likelihood of experiencing campus discrimination?
+
+Campus discrimination remains an important issue in higher education, often shaped by demographic and academic factors. While gender-based bias is widely discussed, it is also relevant to examine whether the **level of study**—undergraduate or postgraduate—plays any role in students’ experiences of discrimination.  
+
+This section explores whether there exists a **significant association between degree level and campus discrimination**. The **Chi-Square Test of Independence** is employed, as both variables are **categorical** in nature. This non-parametric test helps determine whether the observed distribution of responses reflects a meaningful relationship or merely random variation within the data.
+
+
+ **Formulation of Hypothesis**
+ 
+ **Null Hypothesis(H0):**Degree level and campus discrimination are independent.
+
+**Alternative Hypothesis(H1):** Degree level and campus discrimination are not independent.
+
+*The following section presents the contingency table showing the frequency distribution of campus discrimination responses across degree levels, followed by the results of the Chi-Square Test of Independence.*
+
+```{r echo=FALSE}
+library(dplyr)
+
+# Create contingency table
+contingency_table_2 <- matrix(
+  c(42, 27, 7, 11),
+  nrow = 2,
+  byrow = TRUE,
+  dimnames = list(
+    "Degree Level" = c("Undergraduate", "Postgraduate"),
+    "Faced Discrimination" = c("No", "Yes")
+  )
+)
+
+# Convert to data frame for kable display
+contingency_df_2 <- as.data.frame(contingency_table_2)
+contingency_df_2 <- tibble::rownames_to_column(contingency_df_2, var = "Degree Level")
+
+# Display formatted table
+contingency_df_2 %>%
+  kable(
+    caption = "Campus Discrimination Responses by Degree Level",
+    align = "c",
+    col.names = c("Degree Level", "No (Did Not Face Discrimination)", "Yes (Faced Discrimination)")
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    font_size = 12,
+    bootstrap_options = c("striped", "hover", "condensed", "responsive")
+  ) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2E3B82") %>%      # Header: deep navy blue
+  column_spec(1, bold = TRUE, background = "#DCE6F2") %>%                     # Degree column
+  column_spec(2, color = "#1B4F72", bold = TRUE) %>%                          # "No" column
+  column_spec(3, color = "#922B21", bold = TRUE) %>%                          # "Yes" column
+  row_spec(1, background = "#F8F9F9") %>%                                     # Alternating row color
+  row_spec(2, background = "#EAF2F8")
+
+```
+
+
+**Conclusion:**
+
+The Chi-Square Test of Independence yielded a test statistic of $\chi^2 = 11.54$ (df = 1) with a p-value of **0.00068**, which is **less than the 0.05 significance level**.  
+Hence, we **reject the null hypothesis (H0)** and conclude that there is a **statistically significant association between degree level and campus discrimination**.
+
+This suggests that the likelihood of facing discrimination on campus **varies meaningfully across degree levels**. Specifically, **postgraduate students (11 out of 18)** reported facing discrimination at a noticeably higher rate than **undergraduate students (27 out of 69)**.  
+The result implies that **academic level may influence one’s exposure or sensitivity to discriminatory experiences**, possibly due to differing roles, visibility, or social dynamics within the university setting.
+
+Thus, the test provides **empirical evidence** that **degree level and campus discrimination are not independent**, highlighting an important social pattern that merits further qualitative exploration.
+
+
+\newpage
+
+
+
+
+## 8.4 Is there a significant difference in the distribution of depression levels between male and female students?
+
+Mental health experiences such as depression may vary across genders due to social, emotional, or environmental factors.
+To examine whether male and female students show similar or distinct patterns of depression, the **two-sample Kolmogorov–Smirnov (K–S) test** was employed.
+
+
+
+**Formulation of Hypothesis**
+ 
+ **Null Hypothesis(H0):** The distributions of depression scores are the same for male and female students.
+
+**Alternative Hypothesis(H1):** The distributions of depression scores differ significantly between male and female students.
+
+This non-parametric test compares the entire distribution of depression scores between two groups rather than just comparing mean values.
+It is particularly useful here since depression scores are ordinal and may not follow a normal distribution.
+
+*To visually complement the statistical test, an Empirical Cumulative Distribution Function (ECDF) chart is presented.*
+
+```{r echo=FALSE}
+library(ggplot2)
+
+# ECDF Plot for Depression by Gender
+ggplot(mental_health_data, aes(x = depression, color = gender)) +
+  stat_ecdf(size = 1.2) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Empirical Cumulative Distribution of Depression Scores by Gender",
+    x = "Depression Score",
+    y = "Cumulative Probability",
+    color = "Gender"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 12),  # Decreased title font size
+    legend.position = "top"
+  )
+```
+
+
+**Conclusion:**
+
+The Kolmogorov–Smirnov test yielded a statistic of $D = 0.3016$ with a p-value of **0.0255**, which is below the 0.05 significance level.  
+Hence, we **reject the null hypothesis (H0)** and conclude that the **distribution of depression scores differs significantly between male and female students**.  
+
+This result suggests that **gender influences how depression levels are distributed**, rather than merely affecting the average score.  
+As seen in the **Empirical Cumulative Distribution Function (ECDF) plot**, the two curves diverge visibly, confirming that the cumulative probability of depression differs by gender.  
+This implies that **female and male students experience depression in distinct patterns**, highlighting a subtle but meaningful variation in mental-health distribution across genders.
+
+\newpage
+
+## 8.5 Does residential status (hosteller or day scholar) significantly influence the level of academic pressure experienced by students?
+
+Students’ living arrangements can have a notable effect on their academic experience and perceived stress.
+Those residing in hostels may face structured environments with peer interaction and institutional routines, while day scholars often balance home responsibilities alongside academic work.
+To evaluate whether these differing residential environments contribute to variations in academic pressure, the **Mann–Whitney U test (Wilcoxon rank-sum test)** is applied.
+
+
+ **Formulation of Hypothesis**
+ 
+ **Null Hypothesis(H0):** There is no significant difference in academic pressure between hostellers and day scholars.
+
+**Alternative Hypothesis(H1):** There is a significant difference in academic pressure between hostellers and day scholars.
+
+This non-parametric test compares the median academic pressure scores between two independent groups — hostellers and day scholars — without assuming normality of data.
+A non-significant result would imply that residential status does not have a measurable impact on academic pressure, whereas a significant difference would indicate that living arrangements influence students’ perceived workload and stress levels.
+
+*Check the following box-plots to visualize any key relation between these two* 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+# Boxplot: Academic Pressure by Residential Status
+ggplot(mental_health_data, aes(x = residential_status, y = academic_pressure, fill = residential_status)) +
+  geom_boxplot(alpha = 0.7, width = 0.5, outlier.shape = 21, outlier.fill = "white") +
+  scale_fill_manual(values = c("#64B5F6", "#81C784")) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Distribution of Academic Pressure by Residential Status",
+    x = "Residential Status",
+    y = "Academic Pressure Score"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+    legend.position = "none"
+  )
+```
+
+
+**Conclusion:**
+
+The boxplot above visualizes the distribution of **academic pressure scores** among students living **on-campus (hostellers)** and **off-campus (day scholars)**.  
+While minor differences in the median values are visible, both groups show comparable spreads in academic pressure scores.  
+
+The **Mann–Whitney U test** result ($W = 602.5$, $p = 0.2527$) supports this observation, as the p-value exceeds the 0.05 significance threshold.  
+Hence, we **fail to reject the null hypothesis**, concluding that **residential status does not have a statistically significant influence on students’ academic pressure**.  
+
+Overall, the visual and statistical evidence suggest that whether a student resides on or off campus does not substantially alter their perceived academic stress — indicating that other academic or psychological factors might play a more prominent role in shaping pressure levels.
+
+
+## 8.6 Does the level of anxiety among students significantly differ across different academic years?
+
+University life presents students with a wide range of psychological and academic challenges that tend to evolve over time.  
+First-year students may face adjustment issues and uncertainty about expectations, while senior students often deal with increasing workloads, project responsibilities, and post-graduation anxiety.  
+Understanding how anxiety varies across different academic years is crucial for designing effective mental health interventions and campus support systems.
+
+To explore this, we examine whether **anxiety levels differ significantly across academic years** using the **Kruskal–Wallis Rank Sum Test**.  
+
+
+ **Formulation of Hypotheses**
+ 
+ **Null Hypothesis(H0):**The distribution of anxiety scores is the same across all academic years.
+
+**Alternative Hypothesis(H1):** At least one academic year differs significantly in anxiety score distribution.
+
+This non-parametric test is ideal for comparing **three or more independent groups** when the assumption of normality is not satisfied — making it suitable for mental health data that are often ordinal and skewed. The test evaluates whether the median anxiety scores among students in different academic years come from the same population distribution.
+
+*The following plot visualizes anxiety levels across academic years, followed by the Kruskal–Wallis test results.*
+
+```{r echo=FALSE}
+df = mental_health_data
+# 1. Visualize: Anxiety by Academic Year
+ggplot(df, aes(x = academic_year, y = anxiety, fill = academic_year)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.3) +
+  labs(title = "Anxiety Levels by Academic Year",
+       x = "Academic Year", y = "Anxiety Score") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+**Conclusion:**
+
+
+The Kruskal–Wallis test result ($\chi^2$ = 12.992, p = 0.004654) indicates a **significant difference in anxiety levels across academic years** at the 1% level of significance (p < 0.01).  
+This suggests that **students’ anxiety is not uniformly distributed** across different stages of study.  
+From the boxplot, it is observed that **2nd-year students tend to report lower anxiety levels**, whereas **students in higher academic years (especially 3rd and 4th year)** show comparatively **elevated anxiety scores**.  
+These findings imply that **academic progression is associated with varying degrees of mental stress**, possibly influenced by increased workload and future-related concerns.
+
+\newpage
+
+## 8.7 Does average sleep duration have a significant effect on perceived academic pressure among students?
+
+Sleep plays a crucial role in students’ mental health and academic performance. Insufficient or irregular sleep patterns can heighten stress levels, impair focus, and increase perceived academic pressure. To investigate this relationship, we examine whether **average sleep duration** has a significant effect on **academic pressure** using the **Kruskal–Wallis Rank Sum Test**.  
+
+Since both variables are **ordinal and non-normally distributed**, this non-parametric test provides an appropriate and reliable approach for assessing differences in academic pressure across multiple categories of sleep duration.  
+The goal is to determine whether students with shorter sleep durations tend to experience higher academic pressure compared to those who sleep more regularly.
+
+
+**Formulation of Hypotheses**
+ 
+**Null Hypothesis(H0):** The distribution of academic pressure is the same across all levels of average sleep duration.
+
+**Alternative Hypothesis(H1):** At least one sleep-duration group differs significantly in its academic pressure distribution.
+
+Since both variables are **ordinal and non-normally distributed**, this non-parametric test provides an appropriate and reliable approach for assessing differences in academic pressure across multiple categories of sleep duration.  
+The goal is to determine whether students with shorter sleep durations tend to experience higher academic pressure compared to those who sleep more regularly.
+
+*The following plot visualizes how academic pressure scores vary across different sleep duration groups, providing an intuitive sense of the trend before conducting the statistical test.*
+
+```{r echo=FALSE}
+# 3. Visualize: Academic Pressure by Average Sleep
+ggplot(df, aes(x = average_sleep, y = academic_pressure, fill = average_sleep)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.3) +
+  labs(title = "Academic Pressure by Average Sleep Duration",
+       x = "Average Sleep", y = "Academic Pressure Score") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+**Conclusion:**
+
+The Kruskal–Wallis test result yields a test statistic of $\chi^2 = 17.671$ with a p-value of **0.00141**. Since the p-value is **less than 0.05**, we **reject the null hypothesis (H₀)** and conclude that **academic pressure significantly differs across levels of average sleep duration**.  
+
+From the boxplot, it can be observed that students with **shorter average sleep durations report higher levels of academic pressure**, while those who sleep adequately tend to experience less pressure. This suggests a **clear negative relationship** between sleep and academic stress — emphasizing that maintaining **sufficient rest may help students manage academic demands more effectively**.
+
+\newpage
+
+## 8.8 Do male and female students differ significantly in their reported levels of depression?
+
+Gender differences in mental health outcomes have long been an important focus in psychological and social research. Among university students, varying academic expectations, coping styles, and social pressures can contribute to differences in **stress, anxiety, and depression levels** between male and female students. 
+
+To examine this, we investigate whether there is a **significant difference in depression scores between male and female students** using the **Wilcoxon Rank-Sum Test**.  
+
+**Formulation of Hypotheses**
+ 
+**Null Hypothesis(H0):** There is no significant difference in depression scores between male and female students.
+
+**Alternative Hypothesis(H1):** There is a significant difference in depression scores between male and female students.
+
+This non-parametric test is an appropriate alternative to the independent samples t-test when the assumption of normality does not hold. It assesses whether the **median depression scores** differ significantly between two independent groups (Male and Female), helping to determine if observed variations are statistically meaningful or due to chance.
+
+*The following plot visualizes how depression scores vary between genders, providing preliminary understanding before performing the statistical test.*
+
+```{r echo=FALSE}
+# 1. Visualize: Depression by Gender
+ggplot(df, aes(x = gender, y = depression, fill = gender)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.1, alpha = 0.3) +
+  labs(title = "Depression Scores by Gender",
+       x = "Gender", y = "Depression Score") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+**Conclusion:**
+
+The Wilcoxon Rank-Sum Test result shows a test statistic of $W = 927$ with a p-value of **0.0977**, which is greater than the 0.05 level of significance. Therefore, we **fail to reject the null hypothesis (H₀)** and conclude that there is **no statistically significant difference in depression scores between male and female students**.  
+
+While the boxplot suggests that **female students exhibit slightly higher median depression scores** than males, this difference is **not statistically significant**. Hence, the **variation in depression levels** between genders in this dataset is likely **due to random sampling** rather than a systematic effect of gender.
+
+\newpage
+
+# 9. Overall Conclusion
+
+This study applied a range of **non-parametric statistical methods** to explore the relationships between **mental health, academic, and lifestyle factors** among university students. Since the data primarily consisted of **ordinal scores** and **non-normal distributions**, non-parametric techniques provided a flexible and reliable framework for uncovering meaningful patterns without restrictive assumptions.
+
+Initial exploratory analysis revealed that variables such as **academic pressure**, **anxiety**, and **future insecurity** showed higher concentration toward elevated stress levels, while factors like **study satisfaction** and **social relationships** displayed greater variability across students. These findings highlight that while students may be moderately content academically, underlying psychological pressures remain considerable.
+
+The **Spearman and Kendall rank correlations** indicated moderate to strong positive associations between stress-related variables (e.g., anxiety, depression, and academic pressure), confirming their interdependence. The **Run test** further supported that most mental health measures were not randomly distributed, reflecting consistent behavioural patterns within the student population.  
+
+Among group-comparison tests:
+
+- The **Kruskal–Wallis test** identified significant differences in **academic pressure** across **sleep-duration groups**, suggesting that students sleeping less tend to report higher academic stress.  
+
+- The **Wilcoxon rank-sum test** (Mann–Whitney U) showed no significant difference in **academic pressure** between **hostellers and day scholars**, implying that living arrangements alone do not strongly determine perceived workload. 
+
+- The **Chi-Square tests** examining **gender and degree-level discrimination** revealed that gender-based discrimination was not statistically evident in the dataset, though the topic remains socially relevant and may require indirect measurement methods for accurate assessment.  
+- The **Kolmogorov–Smirnov test** showed significant distributional differences in **depression scores by gender**, suggesting that emotional experiences may vary between male and female students.
+
+Overall, the findings emphasize that **academic and psychological pressures are interlinked**, influenced by factors such as **sleep habits**, **academic year**, and **personal well-being**, rather than by structural or demographic categories alone. The application of non-parametric methods proved valuable in handling real-world survey data that deviate from normality and exhibit ordinal characteristics.
+
+In conclusion, this analysis provides evidence-based insights into the **complex nature of student mental health**. It highlights the importance of **holistic academic support systems** that address both academic challenges and emotional well-being, reinforcing that sustainable learning outcomes are deeply connected to mental resilience and lifestyle balance.
+
+\newpage
+
+# 10. References
+
+- Conover, W. J. (1999). *Practical Nonparametric Statistics* (3rd ed.). John Wiley & Sons.  
+→ Classic reference for Kruskal–Wallis, Wilcoxon, and other non-parametric tests.
+
+- Hollander, M., Wolfe, D. A., & Chicken, E. (2013). *Nonparametric Statistical Methods* (3rd ed.). Wiley.  
+→ Comprehensive treatment of the Wilcoxon, Kruskal–Wallis, and Chi-Square tests.
+
+- Field, A., Miles, J., & Field, Z. (2012). *Discovering Statistics Using R*. SAGE Publications.  
+→ Practical guide for performing and interpreting statistical tests using R.
+
+- Siegel, S., & Castellan, N. J. (1988). *Nonparametric Statistics for the Behavioral Sciences* (2nd ed.). McGraw-Hill.  
+→ Standard reference for applying non-parametric methods in psychological and behavioral data.
+
+- Kruskal, W. H., & Wallis, W. A. (1952). *Use of ranks in one-criterion variance analysis*. *Journal of the American Statistical Association*, 47(260), 583–621.  
+→ Original paper introducing the Kruskal–Wallis test.
+
+- Wilcoxon, F. (1945). *Individual comparisons by ranking methods*. *Biometrics Bulletin*, 1(6), 80–83.  
+→ Original paper describing the Wilcoxon Rank-Sum Test.
+
+- Pearson, K. (1900). *On the criterion that a given system of deviations from the probable in the case of a correlated system of variables is such that it can be reasonably supposed to have arisen from random sampling*. *Philosophical Magazine*, 50(302), 157–175.  
+→ Foundational paper introducing the Chi-Square test.
+
+- Banks, M. H., Clegg, C. W., Jackson, P. R., Kemp, N. J., Stafford, E. M., & Wall, T. D. (1980). *The use of the General Health Questionnaire as an indicator of mental health in occupational studies*. *Journal of Occupational Psychology*, 53(3), 187–194.  
+→ Reference for mental health measurement approaches.
+
+---
